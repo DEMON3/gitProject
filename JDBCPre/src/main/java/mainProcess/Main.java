@@ -32,6 +32,7 @@ public class Main {
         try {
 
             List<ItemMap> itemMapList = new ArrayList<>();
+            List<String> label = new ArrayList<>();
             Map<String,String> keyItemMap = new HashMap<>();
             Map<String,String> itemKeyMap = new HashMap<>();
             Map<String,ItemMap> itemMap = new HashMap<>();
@@ -54,7 +55,7 @@ public class Main {
             List<DiabetesSettleGenl> diabetesSettleGenlList = new ArrayList<>();
             //2 得到所有的 genl 记录
             {
-                String qSql = " Select * from Diabetes_Settle_genl_mon1 t where rownum<11  ";
+                String qSql = " Select * from Diabetes_Settle_genl_mon1 t  where rownum<4   ";
                 //		"where t.billing_date >= to_date ('"+str+"','yyyy-mm-dd') and t.billing_date <= to_date ('"+end+"','yyyy-mm-dd') ";
                 WyRowMapper wyMapper = new DiabetesSettleGenlRowMapper();
                 ResultSet myRs = myStmt.executeQuery(qSql);
@@ -67,6 +68,7 @@ public class Main {
             {
                 for(DiabetesSettleGenl cur:diabetesSettleGenlList){
                     String key = cur.getMedicare_registration_id();
+                    label.add(key);
                     if(!map.containsKey(key)) {
                         DiabetesVec value = new DiabetesVec();
                         map.put(key, value);
@@ -88,7 +90,9 @@ public class Main {
             //这一步要过滤掉中药为主的治疗方式
             List<TrainingVec> trainingVecList = new ArrayList<>();
             Set<String> keySet = map.keySet();
-            List<Integer> relateScoreList = new ArrayList<>();
+            List<List<Double>> relateScoreList = new ArrayList<>();
+            List<List<Integer>> trainingList1 = new ArrayList<>();
+            List<List<Integer>> trainingList2 = new ArrayList<>();
             Map<String,List<Integer>> trainingMap = new HashMap<>();
 
             for (String curKey : keySet) {
@@ -105,12 +109,13 @@ public class Main {
                 int score = 0;
 
                 //TrainingVEC
-                List<Integer> attrList = new ArrayList<>();
+                List<Integer> attrList1 = new ArrayList<>();
+                List<Integer> attrList2 = new ArrayList<>();
                 TrainingVec vec = cur.getTrainingVec();
-                int count =0;//记录总条数
-                int sumCount =0;//记录总条数
-                int relateCount =0;//记录总条数
-                int chineseCount =0 ;//记录中药条数
+                double count =0;//记录总条数
+                double sumCount =0;//记录总条数
+                double relateCount =0;//记录总条数
+                double chineseCount =0 ;//记录中药条数
                 for (DiabetesScriptItem item :
                         diabetesScriptItemList) {
                     sumCount++;
@@ -125,30 +130,40 @@ public class Main {
                         int value = AlterTrainingVec.getValue(itemCode, vec);
                         value = (int) (value + item.getQuantity());
                         AlterTrainingVec.doAlter(itemCode, vec, value);
-                     //   System.out.println("brov~!!!!");
+                        //   System.out.println("brov~!!!!");
                     }
                 }
+                if(sumCount==0) sumCount=1;
                 cur.setRelateScore(score);
                 cur.setRelatePercent(relateCount/sumCount);
-                relateScoreList.add(score);
+                List<Double> tempList = new ArrayList<>();
+                tempList.add((double)score);
+                tempList.add(cur.getRelatePercent());
+                relateScoreList.add(tempList);
                 if(count==0) count=1;
-                if(sumCount==0) sumCount=1;
                 if(chineseCount/count>0.5){
                     map.remove(curKey);
                 }else {
                     trainingVecList.add(cur.getTrainingVec());
                     for (int i = 1; i <= 3300; i++) {
                         String curAttr = "item"+i;
-                        int attr = AlterTrainingVec.getValue(curAttr,vec)>0?1:0;
-                        attrList.add(attr);
+                        int attr = AlterTrainingVec.getValue(curAttr,vec);
+                        attrList2.add(attr);
+                        attr = attr > 0?1:0;
+                        attrList1.add(attr);
                     }
-                    trainingMap.put(curKey,attrList);
+                    trainingList1.add(attrList1);
+                    trainingList2.add(attrList2);
+
+                 //   trainingMap.put(curKey,attrList1);
 
                 }
             }
-            String basePath = "/Users/wy/IdeaProjects/JDBCPre/src/main/resources/";
+            String basePath = "F:/WY/gitProject-master/JDBCPre/src/main/resources/";
+            generateJsonFile(new File(basePath+"label.json"),label);
             generateJsonFile(new File(basePath+"train.json"),map);
-            generateJsonFile(new File(basePath+"trainData.json"),trainingMap);
+            generateJsonFile(new File(basePath+"trainingList1.json"),trainingList1);
+            generateJsonFile(new File(basePath+"trainingList2.json"),trainingList2);
             generateJsonFile(new File(basePath+"relateScore.json"),relateScoreList);
             System.out.println(trainingVecList.size());
         }
